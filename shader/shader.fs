@@ -9,3 +9,4 @@ void main() {
     float g = abs(sin(FragPosition.y));
     FragColor = vec4(r, g, 0.0, 1.0);
 }
+
