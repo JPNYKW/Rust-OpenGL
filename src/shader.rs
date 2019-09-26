@@ -57,6 +57,7 @@ impl Shader {
             gl::LinkProgram(id);
             shader.check_compile_errors(id, "PROGRAM");
 
+            // delete
             gl::DeleteShader(vertex);
             gl::DeleteShader(fragment);
 

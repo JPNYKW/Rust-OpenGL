@@ -12,4 +12,5 @@ c_str_macro = "1.0.2"
 imgui = "0.1.0"
 imgui-sdl2 = "0.6.0"
 imgui-opengl-renderer = "0.5.0"
+image = "0.22.1"
 

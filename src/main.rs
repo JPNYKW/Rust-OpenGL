@@ -1,5 +1,6 @@
 use std::mem;
 use std::os::raw::c_void;
+use std::path::Path;
 use std::ptr;
 use std::time::Duration;
 
@@ -11,8 +12,10 @@ use imgui::im_str;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 
+mod image_manager;
 mod shader;
 
+use image_manager::ImageManager;
 use shader::Shader;
 
 #[allow(dead_code)]
@@ -22,9 +25,9 @@ type Vector3 = cgmath::Vector3<f32>;
 #[allow(dead_code)]
 type Matrix4 = cgmath::Matrix4<f32>;
 
-const WINDOW_WIDTH: u32 = 1200;
-const WINDOW_HEIGHT: u32 = 800;
-const FLOAT_NUM: usize = 3;
+const WINDOW_WIDTH: u32 = 900;
+const WINDOW_HEIGHT: u32 = 480;
+const FLOAT_NUM: usize = 8;
 const VERTEX_NUM: usize = 36;
 const BUF_LEN: usize = FLOAT_NUM * VERTEX_NUM;
 
@@ -41,7 +44,7 @@ fn main() {
     }
 
     let window = video_subsystem
-        .window("SDL", WINDOW_WIDTH, WINDOW_HEIGHT)
+        .window("3D / Texture", WINDOW_WIDTH, WINDOW_HEIGHT)
         .opengl()
         .position_centered()
         .build()
@@ -50,63 +53,74 @@ fn main() {
     let _gl_context = window.gl_create_context().unwrap();
     gl::load_with(|s| video_subsystem.gl_get_proc_address(s) as _);
 
-    let shader = Shader::new("shader/shader.vs", "shader/shader.fs");
+    let mut image_manager = ImageManager::new();
+    image_manager.load_image(Path::new("asset/image/WoodenBox.jpg"), "surface", true);
+
+    let shader = Shader::new("asset/shader/vertex.glsl", "asset/shader/fragment.glsl");
 
     let mut vao: u32 = 0;
     let mut vbo: u32 = 0;
 
+    // set buffer
     #[rustfmt::skip]
     let buffer_array: [f32; BUF_LEN] = [
-        0.0, 0.0, 0.0,
-        0.0, 1.0, 0.0,
-        1.0, 1.0, 0.0,
+        // 1
+        0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0,
+        0.0, 1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0,
+        1.0, 1.0, 0.0, 0.0, 0.0, -1.0, 1.0, 0.0,
 
-        0.0, 0.0, 0.0,
-        1.0, 1.0, 0.0,
-        1.0, 0.0, 0.0,
+        0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0,
+        1.0, 1.0, 0.0, 0.0, 0.0, -1.0, 1.0, 0.0,
+        1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 1.0, 1.0,
 
-        0.0, 0.0, 1.0,
-        0.0, 0.0, 0.0,
-        1.0, 0.0, 0.0,
+        // 2
+        0.0, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 1.0,
+        0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0,
+        1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0, 0.0,
 
-        0.0, 0.0, 1.0,
-        1.0, 0.0, 0.0,
-        1.0, 0.0, 1.0,
+        0.0, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 1.0,
+        1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.0, 0.0,
+        1.0, 0.0, 1.0, 0.0, -1.0, 0.0, 1.0, 1.0,
 
-        0.0, 1.0, 1.0,
-        0.0, 0.0, 1.0,
-        1.0, 0.0, 1.0,
+        // 3
+        0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
+        0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+        1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 0.0,
 
-        0.0, 1.0, 1.0,
-        1.0, 0.0, 1.0,
-        1.0, 1.0, 1.0,
+        0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0,
+        1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 0.0,
+        1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
 
-        0.0, 1.0, 0.0,
-        0.0, 1.0, 1.0,
-        1.0, 1.0, 1.0,
+        // 4
+        0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0,
+        0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0,
+        1.0, 1.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0,
 
-        0.0, 1.0, 0.0,
-        1.0, 1.0, 1.0,
-        1.0, 1.0, 0.0,
+        0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0,
+        1.0, 1.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0,
+        1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0,
 
-        1.0, 0.0, 1.0,
-        1.0, 0.0, 0.0,
-        1.0, 1.0, 0.0,
+        // 5
+        1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0,
+        1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
+        1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0,
 
-        1.0, 0.0, 1.0,
-        1.0, 1.0, 0.0,
-        1.0, 1.0, 1.0,
+        1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0,
+        1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0,
+        1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0,
 
-        0.0, 1.0, 1.0,
-        0.0, 1.0, 0.0,
-        0.0, 0.0, 0.0,
+        // 6
+        0.0, 1.0, 1.0, -1.0, 0.0, 0.0, 0.0, 1.0,
+        0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0,
+        0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 1.0, 0.0,
 
-        0.0, 1.0, 1.0,
-        0.0, 0.0, 0.0,
-        0.0, 0.0, 1.0,
+        0.0, 1.0, 1.0, -1.0, 0.0, 0.0, 0.0, 1.0,
+        0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 1.0, 0.0,
+        0.0, 0.0, 1.0, -1.0, 0.0, 0.0, 1.0, 1.0,
     ];
 
     unsafe {
+        // create vertex array and vertex buffer
         gl::GenVertexArrays(1, &mut vao);
         gl::GenBuffers(1, &mut vbo);
 
@@ -119,23 +133,45 @@ fn main() {
             gl::STATIC_DRAW,
         );
 
+        // set attribute pointer
         gl::EnableVertexAttribArray(0);
         gl::VertexAttribPointer(
             0,
             3,
             gl::FLOAT,
             gl::FALSE,
-            3 * mem::size_of::<GLfloat>() as GLsizei,
+            8 * mem::size_of::<GLfloat>() as GLsizei,
             ptr::null(),
         );
+        gl::EnableVertexAttribArray(1);
+        gl::VertexAttribPointer(
+            1,
+            3,
+            gl::FLOAT,
+            gl::FALSE,
+            8 * mem::size_of::<GLfloat>() as GLsizei,
+            (3 * mem::size_of::<GLfloat>()) as *const c_void,
+        );
+        gl::EnableVertexAttribArray(2);
+        gl::VertexAttribPointer(
+            2,
+            2,
+            gl::FLOAT,
+            gl::FALSE,
+            8 * mem::size_of::<GLfloat>() as GLsizei,
+            (6 * mem::size_of::<GLfloat>()) as *const c_void,
+        );
 
+        // unset
         gl::BindBuffer(gl::ARRAY_BUFFER, 0);
         gl::BindVertexArray(0);
     }
 
+    // init imgui
     let mut imgui_context = imgui::Context::create();
     imgui_context.set_ini_filename(None);
 
+    // init imgui sdl2
     let mut imgui_sdl2_context = imgui_sdl2::ImguiSdl2::new(&mut imgui_context, &window);
     let renderer = imgui_opengl_renderer::Renderer::new(&mut imgui_context, |s| {
         video_subsystem.gl_get_proc_address(s) as _
@@ -143,11 +179,40 @@ fn main() {
 
     let mut depth_test: bool = true;
     let mut blend: bool = true;
-    let mut wireframe: bool = true;
+    let mut wireframe: bool = false;
     let mut culling: bool = true;
-    let mut camera_x: f32 = 5.0f32;
-    let mut camera_y: f32 = -5.0f32;
-    let mut camera_z: f32 = 5.0f32;
+    let mut camera_x: f32 = 2.0f32;
+    let mut camera_y: f32 = -2.0f32;
+    let mut camera_z: f32 = 2.0f32;
+    let mut alpha: f32 = 1.0f32;
+    let mut material_specular: Vector3 = Vector3 {
+        x: 0.2,
+        y: 0.2,
+        z: 0.2,
+    };
+    let mut material_shininess: f32 = 0.1f32;
+    let mut light_direction: Vector3 = Vector3 {
+        x: 1.0,
+        y: 1.0,
+        z: 0.0,
+    };
+    let mut ambient: Vector3 = Vector3 {
+        x: 0.3,
+        y: 0.3,
+        z: 0.3,
+    };
+    let mut diffuse: Vector3 = Vector3 {
+        x: 0.5,
+        y: 0.5,
+        z: 0.5,
+    };
+    let mut specular: Vector3 = Vector3 {
+        x: 0.2,
+        y: 0.2,
+        z: 0.2,
+    };
+
+    let surface_texture_id = image_manager.get_texture_id("surface");
 
     let mut event_pump = sdl_context.event_pump().unwrap();
     'running: loop {
@@ -195,9 +260,11 @@ fn main() {
 
             gl::Viewport(0, 0, WINDOW_WIDTH as i32, WINDOW_HEIGHT as i32);
 
+            // clear screen
             gl::ClearColor(1.0, 1.0, 1.0, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
 
+            // init matrice for model, view and projection
             let model_matrix = Matrix4::identity();
             let view_matrix = Matrix4::look_at(
                 Point3 {
@@ -223,14 +290,28 @@ fn main() {
                 100.0,
             );
 
+            // shader use matrices
             shader.use_program();
             shader.set_mat4(c_str!("aModel"), &model_matrix);
             shader.set_mat4(c_str!("aView"), &view_matrix);
             shader.set_mat4(c_str!("aProjection"), &projection_matrix);
+            shader.set_float(c_str!("aAlpha"), alpha);
+            shader.set_vec3(c_str!("viewPosition"), camera_x, camera_y, camera_z);
+            shader.set_vector3(c_str!("material.specular"), &material_specular);
+            shader.set_float(c_str!("material.shininess"), material_shininess);
+            shader.set_vector3(c_str!("light.direction"), &light_direction);
+            shader.set_vector3(c_str!("light.ambient"), &ambient);
+            shader.set_vector3(c_str!("light.diffuse"), &diffuse);
+            shader.set_vector3(c_str!("light.specular"), &specular);
 
+            gl::BindTexture(gl::TEXTURE_2D, surface_texture_id as u32);
+
+            // render triangle with vertex array
             gl::BindVertexArray(vao);
             gl::DrawArrays(gl::TRIANGLES, 0, VERTEX_NUM as i32);
             gl::BindVertexArray(0);
+
+            gl::BindTexture(gl::TEXTURE_2D, 0);
 
             imgui_sdl2_context.prepare_frame(
                 imgui_context.io_mut(),
@@ -239,10 +320,11 @@ fn main() {
             );
 
             let ui = imgui_context.frame();
-            ui.window(im_str!("Information"))
+            ui.window(im_str!("Camera"))
                 .size([300.0, 300.0], imgui::Condition::FirstUseEver)
+                .position([320.0, 10.0], imgui::Condition::FirstUseEver)
                 .build(|| {
-                    ui.text(im_str!("OpenGL in Rust"));
+                    ui.text(im_str!("OpenGL Test App ver 1.0"));
                     ui.separator();
                     ui.text(im_str!("FPS: {:.1}", ui.io().framerate));
                     let display_size = ui.io().display_size;
@@ -265,11 +347,87 @@ fn main() {
 
                     ui.separator();
 
-                    ui.slider_float(im_str!("Camera X"), &mut camera_x, -10.0, 10.0)
+                    ui.slider_float(im_str!("Camera X"), &mut camera_x, -5.0, 5.0)
                         .build();
-                    ui.slider_float(im_str!("Camera Y"), &mut camera_y, -10.0, 10.0)
+                    ui.slider_float(im_str!("Camera Y"), &mut camera_y, -5.0, 5.0)
                         .build();
-                    ui.slider_float(im_str!("Camera Z"), &mut camera_z, -10.0, 10.0)
+                    ui.slider_float(im_str!("Camera Z"), &mut camera_z, -5.0, 5.0)
+                        .build();
+                });
+
+            ui.window(im_str!("Light"))
+                .size([300.0, 450.0], imgui::Condition::FirstUseEver)
+                .position([10.0, 10.0], imgui::Condition::FirstUseEver)
+                .build(|| {
+                    ui.slider_float(im_str!("Alpha"), &mut alpha, 0.0, 1.0)
+                        .build();
+
+                    ui.separator();
+
+                    ui.slider_float(
+                        im_str!("Material Specular X"),
+                        &mut material_specular.x,
+                        0.0,
+                        1.0,
+                    )
+                    .build();
+                    ui.slider_float(
+                        im_str!("Material Specular Y"),
+                        &mut material_specular.y,
+                        0.0,
+                        1.0,
+                    )
+                    .build();
+                    ui.slider_float(
+                        im_str!("Material Specular Z"),
+                        &mut material_specular.z,
+                        0.0,
+                        1.0,
+                    )
+                    .build();
+
+                    ui.slider_float(
+                        im_str!("Material Shininess"),
+                        &mut material_shininess,
+                        0.0,
+                        2.0,
+                    )
+                    .build();
+
+                    ui.separator();
+
+                    ui.slider_float(im_str!("Direction X"), &mut light_direction.x, -1.0, 1.0)
+                        .build();
+                    ui.slider_float(im_str!("Direction Y"), &mut light_direction.y, -1.0, 1.0)
+                        .build();
+                    ui.slider_float(im_str!("Direction Z"), &mut light_direction.z, -1.0, 1.0)
+                        .build();
+
+                    ui.separator();
+
+                    ui.slider_float(im_str!("Ambient R"), &mut ambient.x, 0.0, 1.0)
+                        .build();
+                    ui.slider_float(im_str!("Ambient G"), &mut ambient.y, 0.0, 1.0)
+                        .build();
+                    ui.slider_float(im_str!("Ambient B"), &mut ambient.z, 0.0, 1.0)
+                        .build();
+
+                    ui.separator();
+
+                    ui.slider_float(im_str!("Diffuse R"), &mut diffuse.x, 0.0, 1.0)
+                        .build();
+                    ui.slider_float(im_str!("Diffuse G"), &mut diffuse.y, 0.0, 1.0)
+                        .build();
+                    ui.slider_float(im_str!("Diffuse B"), &mut diffuse.z, 0.0, 1.0)
+                        .build();
+
+                    ui.separator();
+
+                    ui.slider_float(im_str!("Specular R"), &mut specular.x, 0.0, 1.0)
+                        .build();
+                    ui.slider_float(im_str!("Specular G"), &mut specular.y, 0.0, 1.0)
+                        .build();
+                    ui.slider_float(im_str!("Specular B"), &mut specular.z, 0.0, 1.0)
                         .build();
                 });
 
